@@ -1,0 +1,133 @@
+name: Playwright Tests
+
+on:
+  push:
+    branches: [main, dev, master]
+  pull_request:
+    branches: [main, dev, master]
+  schedule:
+    - cron: "17 2 * * *"
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Environment to run tests against"
+        required: true
+        default: "dev"
+        type: choice
+        options:
+          - dev
+          - stage
+          - prod
+      test_tag:
+        description: "Select Test Tag to run"
+        required: true
+        default: "all"
+        type: choice
+        options:
+          - all
+          - "@smoke"
+          - "@api"
+          - "@ui"
+          - "@regression"
+          - "@sanity"
+      test_file:
+        description: "Path to specific test file or pattern (optional, e.g. tests/api/users.spec.ts)"
+        required: false
+        default: ""
+        type: string
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  test:
+    timeout-minutes: 60
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Repo checkout
+        uses: actions/checkout@v4
+
+      - name: Download Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+          cache: "npm"
+
+      - name: Download dependencies
+        run: npm ci
+
+      - name: Download Playwright Browsers
+        run: npm run install:browsers
+
+      - name: Set Target Environment & Run Arguments
+        id: set-args
+        run: |
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            TARGET_ENV="prod"
+            CLI_ARGS="--grep @regression"
+          elif [ "${{ github.event_name }}" = "push" ] || [ "${{ github.event_name }}" = "pull_request" ]; then
+            if [ "${{ github.ref_name }}" = "main" ] || [ "${{ github.ref_name }}" = "master" ]; then
+              TARGET_ENV="prod"
+            elif [ "${{ github.ref_name }}" = "dev" ]; then
+              TARGET_ENV="dev"
+            else
+              TARGET_ENV="stage"
+            fi
+            CLI_ARGS="--grep @smoke"
+          elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TARGET_ENV="${{ inputs.environment }}"
+            CLI_ARGS=""
+
+            if [ "${{ inputs.test_tag }}" != "all" ]; then
+              CLI_ARGS="$CLI_ARGS --grep \"${{ inputs.test_tag }}\""
+            fi
+
+            if [ -n "${{ inputs.test_file }}" ]; then
+              CLI_ARGS="$CLI_ARGS ${{ inputs.test_file }}"
+            fi
+          fi
+
+          echo "SELECTED_ENV=$TARGET_ENV" >> $GITHUB_ENV
+          echo "PLAYWRIGHT_ARGS=$CLI_ARGS" >> $GITHUB_ENV
+
+          echo "Selected Environment: $TARGET_ENV"
+          echo "Playwright CLI Arguments: $CLI_ARGS"
+
+      - name: Run Playwright tests
+        run: npm test -- ${{ env.PLAYWRIGHT_ARGS }}
+        env:
+          ENV: ${{ env.SELECTED_ENV }}
+          HEADLESS: true
+
+      - name: Generate Allure Report
+        if: always()
+        run: npm run allure:generate
+
+      - name: Setup Pages
+        if: always()
+        uses: actions/configure-pages@v4
+
+      - name: Upload Allure Report Artifact for Pages
+        if: always()
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: "allure-report"
+
+  deploy-report:
+    needs: test
+    if: always()
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

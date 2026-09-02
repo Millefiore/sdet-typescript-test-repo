@@ -1,0 +1,37 @@
+# Deps
+node_modules/
+jspm_packages/
+
+# Reports and Artifacts Playwright
+/playwright-report/
+/blob-report/
+/test-results/
+/playwright/.cache/
+
+# Generated sources
+*.png
+*.jpeg
+*.webm
+
+# But keep tracked documentation images
+!.github/assets/*.png
+
+# System files
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Allure reports
+allure-results/
+allure-report/
+
+# Claude local
+/.claude/*.local.json

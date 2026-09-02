@@ -1,0 +1,19 @@
+{
+  "files": ["src/**/*.ts", "tests/**/*.ts"],
+  "ignores": ["node_modules/**", "dist/**", "*.d.ts"],
+  "rules": {
+    "indent": 2,
+    "semi": true,
+    "quotes": "single",
+    "trailingComma": "all",
+    "printWidth": 120,
+    "tabWidth": 2,
+    "useTabs": false,
+    "singleQuote": true,
+    "bracketSpacing": true,
+    "arrowParens": "always",
+    "endOfLine": "lf",
+    "insertFinalNewline": true,
+    "trimTrailingWhitespace": true
+  }
+}
